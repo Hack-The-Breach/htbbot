@@ -1,0 +1,5 @@
+htbbot
+.env
+.ropeproject
+*.json
+test.py

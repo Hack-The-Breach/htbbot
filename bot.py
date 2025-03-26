@@ -128,6 +128,41 @@ async def verifystatcheck(ctx, id: str = ''):
 email: {id_map[id]['email']}")
 
 @bot.command()
+async def htbpurge(ctx, amount: int = 0):
+    has_role = discord.utils.get(ctx.author.roles, name='Organizer')
+    if not has_role:
+        await ctx.send("Bruh! you don't have permission to use this command.")
+        return
+
+    # Validate amount
+    if amount <= 0:
+        await ctx.send("Please provide a positive number of messages to delete.")
+        return
+
+    # Discord API limits bulk deletion to 100 messages at a time
+    if amount > 100:
+        await ctx.send("You can only delete up to 100 messages at a time.")
+        return
+
+    try:
+        # Delete the command message first
+        await ctx.message.delete()
+
+        # Bulk delete messages
+        deleted = await ctx.channel.purge(limit=amount)
+
+        # Send a confirmation message
+        confirmation = await ctx.send(f"Deleted {len(deleted)} messages.")
+
+        # Auto-delete the confirmation message after 5 seconds
+        await confirmation.delete(delay=2)
+
+    except discord.Forbidden:
+        await ctx.send("I don't have permission to delete messages.")
+    except discord.HTTPException:
+        await ctx.send("An error occurred while trying to delete messages.")
+
+@bot.command()
 async def htbwhoareyou(ctx):
     await ctx.send("Hey there! I'm the HackTheBreach Bot. Hope you're having an awesome time at the bootcamp!\n\
 Created by Arka Mondal ([Arix](https://github.com/arixsnow))!")

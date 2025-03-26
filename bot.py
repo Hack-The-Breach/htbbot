@@ -7,7 +7,7 @@ import json
 import os
 import sys
 from discord.ext import commands
-from config import TOKEN
+from config import ROLE_ID, TOKEN
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -16,20 +16,24 @@ intents.members = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
 # Load data
-with open('participants.json', 'r') as f:
+with open('participant.json', 'r') as f:
     participants = json.load(f)
 
-id_map = {value['id']: {'email': key, 'name': value['name']} for key, value in participants.items()}
+id_map = {value['id']: {'email': key, 'name': value['name'], 'password': value['password']} for key, value in participants.items()}
 
 claimed = {}
-if os.path.exists('claimed.json'):
+claimed_inv = {}
+if os.path.exists('claimed.json') and os.path.getsize('claimed.json') > 0:
     with open('claimed.json') as f:
         claimed = json.load(f)
 
+    for key, value in claimed.items():
+        claimed_inv[value] = key
+
 @bot.command()
-async def verify(ctx, id: str = ''):
-    if id == '':
-        await ctx.send("Usage: `!verify <id>`")
+async def verify(ctx, id: str = '', passkey: str = ''):
+    if id == '' or passkey == '':
+        await ctx.send("Usage: `!verify <id> <password>`")
         return
 
     # Check if command is used in 'verify' channel
@@ -43,8 +47,20 @@ async def verify(ctx, id: str = ''):
         await ctx.send(f'Invalid ID: {id}. Please check your ID and try again.')
         return
 
+    # check if the user is trying to verify using another id
+    if str(ctx.author.id) in claimed.values() and id != claimed_inv[str(ctx.author.id)]:
+        await ctx.send(f'**WARNING!** You have been already verified with another id.<@&{int(ROLE_ID)}>')
+        return
+
     if id in claimed:
-        await ctx.send(f'This ID ({id}) has already been claimed.')
+        if str(ctx.author.id) == claimed[id]:
+            await ctx.send('You have been already verified.')
+        else:
+            await ctx.send(f'This ID ({id}) has already been claimed.')
+        return
+
+    if passkey != id_map[id]['password']:
+        await ctx.send(f'Incorrect password for id: {id}')
         return
 
     # Find the role
@@ -57,6 +73,7 @@ async def verify(ctx, id: str = ''):
         # Add role and update records
         await ctx.author.add_roles(role)
         claimed[id] = str(ctx.author.id)
+        claimed_inv[str(ctx.author.id)] = id
 
         # Save claimed IDs
         with open('claimed.json', 'w') as f:
@@ -70,23 +87,24 @@ async def verify(ctx, id: str = ''):
         await ctx.send("Error processing verification. Contact Organizers.")
 
 @bot.command()
-async def help(ctx):
+async def htbhelp(ctx):
     """Displays help information for bot commands."""
     help_message = (
-        "**Available Commands:**\n"
-        "`!verify <id>` - Verify yourself using your participant ID.\n"
-        "`!help` - Display this help message.\n"
-        "**Example Usage:**\n"
-        "`!verify 12345` - Verifies your ID and assigns the appropriate role.\n\n"
-        "====== Organizers Only ======"
-        "`!verifystatcheck <id>` - Check the verification status of participant"
+        "**Available Commands:**\n\n"
+        "`!verify <id> <password>` - Verify yourself using your participant ID.\n\n"
+        "\t**Example Usage:**\n"
+        "\t`!verify 12345 password` - Verifies your ID and assigns the appropriate role.\n\n"
+        "`!htbwhoareyou` - Display a fun message.\n"
+        "`!htbhelp` - Display this help message.\n\n"
+        "====== Organizers Only ======\n"
+        "`!verifystatcheck <id>` - Check the verification status of participant\n"
     )
     await ctx.send(help_message)
 
 @bot.command()
 async def verifystatcheck(ctx, id: str = ''):
     if id == '':
-        await ctx.send("Usage: `!verify <id>`")
+        await ctx.send("Usage: `!verifystatcheck <id>`")
         return
 
     has_role = discord.utils.get(ctx.author.roles, name='Organizer')
@@ -99,12 +117,16 @@ async def verifystatcheck(ctx, id: str = ''):
         return
 
     if id not in claimed:
-        await ctx.send(f"Verification Status Unknown of id: {id}.")
+        await ctx.send(f"Verification Status unknown of id: {id}.")
         return
 
     await ctx.send(f"Verifciation Status : success\n{id} -> user: `{claimed[id]}` name: {id_map[id]['name']} \
 email: {id_map[id]['email']}")
 
+@bot.command()
+async def htbwhoareyou(ctx):
+    await ctx.send("Hey there! I'm the HackTheBreach Bot. Hope you're having an awesome time at the bootcamp!\n\
+Created by Arka Mondal ([Arix](https://github.com/arixsnow))!")
 
 if __name__ == '__main__':
     if TOKEN == "":

@@ -3,3 +3,4 @@ htbbot
 .ropeproject
 *.json
 test.py
+__pycache__

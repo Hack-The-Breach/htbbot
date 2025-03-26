@@ -8,4 +8,5 @@ from typing import Final
 
 load_dotenv()
 
-TOKEN: Final[str] = os.getenv("DISCORD_TOKEN", "")
+TOKEN: Final[str] = os.getenv("DISCORD_BOT_TOKEN", "")
+ROLE_ID: Final[str] = os.getenv("ROLE_ID", "0")

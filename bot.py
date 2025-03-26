@@ -75,11 +75,31 @@ async def help(ctx):
     help_message = (
         "**Available Commands:**\n"
         "`!verify <id>` - Verify yourself using your participant ID.\n"
-        "`!help` - Display this help message.\n\n"
+        "`!help` - Display this help message.\n"
         "**Example Usage:**\n"
-        "`!verify 12345` - Verifies your ID and assigns the appropriate role."
+        "`!verify 12345` - Verifies your ID and assigns the appropriate role.\n\n"
+        "====== Admin Only ======"
+        "`!verifystatcheck <id>` - Check the verification status of participant (Admin Only)"
     )
     await ctx.send(help_message)
+
+@bot.command()
+async def verifystatcheck(ctx, id: str = ''):
+    if id == '':
+        await ctx.send("Usage: `!verify <id>`")
+        return
+
+    if ctx.channel.name != 'admin-verify-stat-check':
+        await ctx.send("This command can only be used in the #admin-verify-stat-check channel.")
+        return
+
+    if id not in claimed:
+        await ctx.send(f"Verification Status Unknown of id: {id}.")
+        return
+
+    await ctx.send(f"Verifciation Status : success\n{id} -> user: `{claimed[id]}` name: {id_map[id]['name']} \
+email: {id_map[id]['email']}")
+
 
 if __name__ == '__main__':
     if TOKEN == "":

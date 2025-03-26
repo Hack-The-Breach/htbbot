@@ -50,7 +50,7 @@ async def verify(ctx, id: str = ''):
     # Find the role
     role = discord.utils.get(ctx.guild.roles, name="'25 Participant")
     if not role:
-        await ctx.send('Role not found. Contact server admin.')
+        await ctx.send('Role not found. Contact Organizers.')
         return
 
     try:
@@ -64,10 +64,10 @@ async def verify(ctx, id: str = ''):
 
         await ctx.send(f'Verified as **{participant["name"]}**! You\'ve received the "{role.name}" role.')
     except discord.Forbidden:
-        await ctx.send("I don't have permission to assign roles. Contact serv admin.")
+        await ctx.send("I don't have permission to assign roles. Contact Organizers.")
     except Exception as e:
         print(f'Error: {e}')
-        await ctx.send("Error processing verification. Contact server admin.")
+        await ctx.send("Error processing verification. Contact Organizers.")
 
 @bot.command()
 async def help(ctx):
@@ -78,8 +78,8 @@ async def help(ctx):
         "`!help` - Display this help message.\n"
         "**Example Usage:**\n"
         "`!verify 12345` - Verifies your ID and assigns the appropriate role.\n\n"
-        "====== Admin Only ======"
-        "`!verifystatcheck <id>` - Check the verification status of participant (Admin Only)"
+        "====== Organizers Only ======"
+        "`!verifystatcheck <id>` - Check the verification status of participant"
     )
     await ctx.send(help_message)
 
@@ -87,6 +87,11 @@ async def help(ctx):
 async def verifystatcheck(ctx, id: str = ''):
     if id == '':
         await ctx.send("Usage: `!verify <id>`")
+        return
+
+    has_role = discord.utils.get(ctx.author.roles, name='Organizer')
+    if not has_role:
+        await ctx.send("Bruh! you don't have permission to use this command.")
         return
 
     if ctx.channel.name != 'admin-verify-stat-check':

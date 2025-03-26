@@ -15,8 +15,12 @@ intents.members = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
+participants_data = 'participants.json'
+if len(sys.argv) > 1:
+    participants_data = sys.argv[1]
+
 # Load data
-with open('participant.json', 'r') as f:
+with open(participants_data, 'r') as f:
     participants = json.load(f)
 
 id_map = {value['id']: {'email': key, 'name': value['name'], 'password': value['password']} for key, value in participants.items()}

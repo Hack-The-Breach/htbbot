@@ -6,8 +6,9 @@ import discord
 import json
 import os
 import sys
+import datetime
 from discord.ext import commands
-from config import ROLE_ID, TOKEN
+from config import ROLE_ID, TOKEN, LOG_CHANNEL_ID
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -305,6 +306,146 @@ async def htbpurge(ctx, amount: int = 0):
 async def htbwhoareyou(ctx):
     await ctx.send("Hey there! I'm the HackTheBreach Bot. Hope you're having an awesome time at the bootcamp!\n\
 Created by Arka Mondal ([Arix](https://github.com/arixsnow))!")
+
+# Event listeners for logging
+@bot.event
+async def on_ready():
+    print(f'{bot.user.name} has connected to Discord!')
+    print(f'Bot is in {len(bot.guilds)} guilds')
+
+@bot.event
+async def on_message_delete(message):
+    # Ignore messages from bots
+    if message.author.bot:
+        return
+        
+    # Get the log channel
+    log_channel = bot.get_channel(LOG_CHANNEL_ID)
+    if not log_channel:
+        return  # Log channel not found
+        
+    # Create an embed for the deleted message
+    embed = discord.Embed(
+        title="Message Deleted",
+        description=f"Message by {message.author.mention} deleted in {message.channel.mention}",
+        color=discord.Color.red(),
+        timestamp=datetime.datetime.now()
+    )
+    
+    # Add message content if available
+    if message.content:
+        # Truncate if too long
+        content = message.content
+        if len(content) > 1024:
+            content = content[:1021] + "..."
+        embed.add_field(name="Content", value=content, inline=False)
+    
+    # Add attachments info if any
+    if message.attachments:
+        attachment_info = "\n".join([f"[{a.filename}]({a.url})" for a in message.attachments])
+        if attachment_info:
+            embed.add_field(name="Attachments", value=attachment_info, inline=False)
+    
+    # Add footer with user info
+    embed.set_footer(text=f"User ID: {message.author.id} | Message ID: {message.id}")
+    
+    # Send the log
+    await log_channel.send(embed=embed)
+
+@bot.event
+async def on_message_edit(before, after):
+    # Ignore edits by bots or when content hasn't changed
+    if before.author.bot or before.content == after.content:
+        return
+        
+    # Get the log channel
+    log_channel = bot.get_channel(LOG_CHANNEL_ID)
+    if not log_channel:
+        return  # Log channel not found
+        
+    # Create an embed for the edited message
+    embed = discord.Embed(
+        title="Message Edited",
+        description=f"Message by {before.author.mention} edited in {before.channel.mention}",
+        color=discord.Color.gold(),
+        timestamp=datetime.datetime.now()
+    )
+    
+    # Add before content
+    if before.content:
+        # Truncate if too long
+        content = before.content
+        if len(content) > 1024:
+            content = content[:1021] + "..."
+        embed.add_field(name="Before", value=content, inline=False)
+    
+    # Add after content
+    if after.content:
+        # Truncate if too long
+        content = after.content
+        if len(content) > 1024:
+            content = content[:1021] + "..."
+        embed.add_field(name="After", value=content, inline=False)
+    
+    # Add link to the message
+    embed.add_field(
+        name="Jump to Message", 
+        value=f"[Click here]({after.jump_url})", 
+        inline=False
+    )
+    
+    # Add footer with user info
+    embed.set_footer(text=f"User ID: {before.author.id} | Message ID: {before.id}")
+    
+    # Send the log
+    await log_channel.send(embed=embed)
+
+@bot.event
+async def on_guild_channel_create(channel):
+    # Get the log channel
+    log_channel = bot.get_channel(LOG_CHANNEL_ID)
+    if not log_channel:
+        return  # Log channel not found
+        
+    # Get channel type
+    if isinstance(channel, discord.TextChannel):
+        channel_type = "Text Channel"
+    elif isinstance(channel, discord.VoiceChannel):
+        channel_type = "Voice Channel"
+    elif isinstance(channel, discord.CategoryChannel):
+        channel_type = "Category"
+    else:
+        channel_type = "Channel"
+    
+    # Get audit logs to find who created the channel
+    try:
+        async for entry in channel.guild.audit_logs(limit=1, action=discord.AuditLogAction.channel_create):
+            creator = entry.user
+            break
+    except:
+        creator = None
+    
+    # Create an embed for the channel creation
+    embed = discord.Embed(
+        title=f"{channel_type} Created",
+        description=f"#{channel.name} was created",
+        color=discord.Color.green(),
+        timestamp=datetime.datetime.now()
+    )
+    
+    # Add creator info if available
+    if creator:
+        embed.add_field(name="Created By", value=f"{creator.mention} ({creator.name}#{creator.discriminator})", inline=False)
+    
+    # Add category if applicable
+    if hasattr(channel, 'category') and channel.category:
+        embed.add_field(name="Category", value=channel.category.name, inline=False)
+    
+    # Add channel ID
+    embed.set_footer(text=f"Channel ID: {channel.id}")
+    
+    # Send the log
+    await log_channel.send(embed=embed)
 
 if __name__ == '__main__':
     if TOKEN == "":

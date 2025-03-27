@@ -35,6 +35,44 @@ if os.path.exists('claimed.json') and os.path.getsize('claimed.json') > 0:
         claimed_inv[value] = key
 
 @bot.command()
+async def htbclearverifystat(ctx):
+    has_role = discord.utils.get(ctx.author.roles, name='Organizer')
+    if not has_role:
+        await ctx.send("Bruh! you don't have permission to use this command.")
+        return
+
+    if ctx.channel.name != 'admin-verify-stat-check':
+        await ctx.send("This command can only be used in the #admin-verify-stat-check channel.")
+        return
+
+    role = discord.utils.get(ctx.guild.roles, name="'25 Participant")
+    if not role:
+        await ctx.send("Error: Role '25 Participant not found.")
+        return
+
+    rm_count = 0
+    rm_list = {}
+    for htbid, member_id in claimed.items():
+        member = ctx.guild.get_memeber(int(member_id))
+        if member and role in member.roles:
+            await member.remove_roles(role)
+            rm_count += 1
+            rm_list[htbid] = member_id
+
+    # delete purged member list from verification status
+    for htbid in rm_list.keys():
+        del claimed[htbid]
+
+    for member_id in rm_list.values():
+        del claimed_inv[member_id]
+
+    with open('claimed.json', 'w') as f:
+        json.dump(claimed, f, indent=4)
+
+    await ctx.send(f"Removed \"'25 Participant\" from {rm_count} members.\nMember list: {' '.join(rm_list.values())}")
+
+
+@bot.command()
 async def verify(ctx, id: str = '', passkey: str = ''):
     if id == '' or passkey == '':
         await ctx.send("Usage: `!verify <id> <password>`")
@@ -101,14 +139,16 @@ async def htbhelp(ctx):
         "`!htbwhoareyou` - Display a fun message.\n"
         "`!htbhelp` - Display this help message.\n\n"
         "====== Organizers Only ======\n"
-        "`!verifystatcheck <id>` - Check the verification status of participant\n"
+        "`!htbverifystatcheck <id>|dumpall` - Check the verification status of participant\n"
+        "`!htbpurge <count>` - Purge #count messages\n"
+        "`!htbclearverifystat` - Purge all verification status of all participants\n"
     )
     await ctx.send(help_message)
 
 @bot.command()
-async def verifystatcheck(ctx, id: str = ''):
+async def htbverifystatcheck(ctx, id: str = ''):
     if id == '':
-        await ctx.send("Usage: `!verifystatcheck <id>`")
+        await ctx.send("Usage: `!htbverifystatcheck <id>`")
         return
 
     has_role = discord.utils.get(ctx.author.roles, name='Organizer')
@@ -118,6 +158,10 @@ async def verifystatcheck(ctx, id: str = ''):
 
     if ctx.channel.name != 'admin-verify-stat-check':
         await ctx.send("This command can only be used in the #admin-verify-stat-check channel.")
+        return
+
+    if id == 'dumpall':
+        await ctx.send(f"Vefiication Status: success\n{'\n'.join(f'{key}: {value}' for key, value in claimed.items())}")
         return
 
     if id not in claimed:
@@ -150,8 +194,6 @@ async def htbpurge(ctx, amount: int = 0):
 
         # Bulk delete messages
         deleted = await ctx.channel.purge(limit=amount)
-
-        # Send a confirmation message
         confirmation = await ctx.send(f"Deleted {len(deleted)} messages.")
 
         # Auto-delete the confirmation message after 5 seconds

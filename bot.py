@@ -58,7 +58,7 @@ async def htbclearverifystat(ctx):
     rm_count = 0
     rm_list = {}
     for htbid, member_id in claimed.items():
-        member = ctx.guild.get_memeber(int(member_id))
+        member = ctx.guild.get_member(int(member_id))
         if member and role in member.roles:
             await member.remove_roles(role)
             rm_count += 1

@@ -13,6 +13,9 @@ from config import ROLE_ID, TOKEN, LOG_CHANNEL_ID, WELCOME_CHANNEL_ID
 
 intents = discord.Intents.default()
 intents.message_content = True
+intents.messages = True
+intents.guilds = True
+intents.bans = True
 intents.members = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
@@ -75,9 +78,9 @@ async def htbclearverifystat(ctx):
 
 
 @bot.command()
-async def verify(ctx, id: str = '', passkey: str = ''):
+async def htbverify(ctx, id: str = '', passkey: str = ''):
     if id == '' or passkey == '':
-        await ctx.send("Usage: `!verify <id> <password>`")
+        await ctx.send("Usage: `!htbverify <id> <password>`")
         return
 
     # Check if command is used in 'verify' channel
@@ -131,7 +134,7 @@ async def verify(ctx, id: str = '', passkey: str = ''):
         await ctx.send("Error processing verification. Contact Organizers.")
 
 @bot.command()
-async def ban(ctx, member: Optional[discord.Member] = None, reason: Optional[str] = None):
+async def htbban(ctx, member: Optional[discord.Member] = None, reason: Optional[str] = None):
     """Bans a member from the server."""
     # Check if user has Organizer role
     has_role = discord.utils.get(ctx.author.roles, name='Organizer')
@@ -141,7 +144,7 @@ async def ban(ctx, member: Optional[discord.Member] = None, reason: Optional[str
 
     # Check if a member was specified
     if member is None:
-        await ctx.send("Usage: `!ban @user [reason]`")
+        await ctx.send("Usage: `!htbban @user [reason]`")
         return
 
     # Cannot ban yourself
@@ -166,7 +169,7 @@ async def ban(ctx, member: Optional[discord.Member] = None, reason: Optional[str
             pass  # Ignore if the user has DMs closed
 
         # Ban the member
-        await ctx.guild.ban(member, reason=reason, delete_message_days=0)
+        await ctx.guild.ban(member, reason=reason, delete_message_seconds=0)
 
         # Confirmation message
         confirmation = f"{member} has been banned."
@@ -196,7 +199,7 @@ async def ban(ctx, member: Optional[discord.Member] = None, reason: Optional[str
         await ctx.send(f"An error occurred while trying to ban the member: {e}")
 
 @bot.command()
-async def unban(ctx, member_id: Optional[int] = None):
+async def htbunban(ctx, member_id: Optional[int] = None):
     """Unbans a member from the server."""
     has_role = discord.utils.get(ctx.author.roles, name='Organizer')
     if not has_role:
@@ -204,12 +207,12 @@ async def unban(ctx, member_id: Optional[int] = None):
         return
 
     if member_id is None:
-        await ctx.send("Usage: `!unban <user_id>`")
+        await ctx.send("Usage: `!htbunban <user_id>`")
         return
 
     try:
-        # Fetch the list of banned users
-        banned_users = await ctx.guild.bans()
+        # Fetch the list of banned users properly
+        banned_users = [ban async for ban in ctx.guild.bans()]
         user = next((ban_entry.user for ban_entry in banned_users if ban_entry.user.id == member_id), None)
 
         if user is None:
@@ -219,6 +222,14 @@ async def unban(ctx, member_id: Optional[int] = None):
         # Unban the user
         await ctx.guild.unban(user)
         await ctx.send(f"User {user} ({member_id}) has been unbanned.")
+
+        # DM the user before unbanning if possible
+        # ban_message = "You have been unbanned"
+        # member = await bot.fetch_user(member_id)
+        # try:
+        #     await member.send(ban_message)
+        # except discord.HTTPException:
+        #     pass
 
         # Log the unban action
         log_channel = bot.get_channel(LOG_CHANNEL_ID)
@@ -240,7 +251,7 @@ async def unban(ctx, member_id: Optional[int] = None):
 
 @bot.command()
 @commands.has_permissions(kick_members=True)
-async def kick(ctx, member: Optional[discord.Member], reason: Optional[str] = None):
+async def htbkick(ctx, member: Optional[discord.Member], reason: Optional[str] = None):
     """Kicks a member from the server."""
     has_role = discord.utils.get(ctx.author.roles, name='Organizer')
     if not has_role:
@@ -248,7 +259,7 @@ async def kick(ctx, member: Optional[discord.Member], reason: Optional[str] = No
         return
 
     if member is None:
-        await ctx.send("Usage: `!kick @user [reason]`")
+        await ctx.send("Usage: `!htbkick @user [reason]`")
         return
 
     if member == ctx.author:
@@ -301,15 +312,15 @@ async def htbhelp(ctx):
     """Displays help information for bot commands."""
     help_message = (
         "**Available Commands:**\n\n"
-        "`!verify <id> <password>` - Verify yourself using your participant ID.\n\n"
+        "`!htbverify <id> <password>` - Verify yourself using your participant ID.\n\n"
         "\t**Example Usage:**\n"
-        "\t`!verify 12345 password` - Verifies your ID and assigns the appropriate role.\n\n"
+        "\t`!htbverify 12345 password` - Verifies your ID and assigns the appropriate role.\n\n"
         "`!htbwhoareyou` - Display a fun message.\n"
         "`!htbhelp` - Display this help message.\n\n"
         "====== Organizers Only ======\n"
-        "`!ban @user [reason]` - Ban a user from the server.\n"
-        "`!unban <user_id>` - Unban a user from the server.\n"
-        "`!kick @user [reason]` - Kick a user from the server.\n"
+        "`!htbban @user [reason]` - Ban a user from the server.\n"
+        "`!htbunban <user_id>` - Unban a user from the server.\n"
+        "`!htbkick @user [reason]` - Kick a user from the server.\n"
         "`!htbverifystatcheck <id>|dumpall` - Check the verification status of participant\n"
         "`!htbpurge <count>` - Purge #count messages\n"
         "`!htbclearverifystat` - Purge all verification status of all participants\n"
@@ -332,7 +343,8 @@ async def htbverifystatcheck(ctx, id: str = ''):
         return
 
     if id == 'dumpall':
-        await ctx.send(f"Vefiication Status: success\n{'\n'.join(f'{key}: {value}' for key, value in claimed.items())}")
+        id_string = '\n'.join(f'{key}: {value}' for key, value in claimed.items())
+        await ctx.send(f"**Vefiication Status: success**\n{id_string}")
         return
 
     if id not in claimed:
@@ -384,7 +396,8 @@ Created by Arka Mondal ([Arix](https://github.com/arixsnow)) and Suvan Sarkar ([
 @bot.event
 async def on_ready():
     print(f'{bot.user.name if bot.user else "Unkown"} has connected to Discord!')
-    print(f'Bot is in {len(bot.guilds)} guilds')
+    guild_str = 'guilds' if len(bot.guilds) > 1 else 'guild'
+    print(f"Bot is in {len(bot.guilds)} {guild_str}")
 
 @bot.event
 async def on_member_join(member):

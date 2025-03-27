@@ -94,10 +94,10 @@ async def verify(ctx, id: str = '', passkey: str = ''):
 @bot.command()
 async def ban(ctx, member: discord.Member = None, *, reason=None):
     """Bans a member from the server."""
-    # Check if user has moderator role
-    has_role = discord.utils.get(ctx.author.roles, name='Moderator')
+    # Check if user has Organizer role
+    has_role = discord.utils.get(ctx.author.roles, name='Organizer')
     if not has_role:
-        await ctx.send("You don't have permission to use this command. Moderator role required.")
+        await ctx.send("You don't have permission to use this command. Organizer role required.")
         return
 
     # Check if a member was specified
@@ -144,10 +144,10 @@ async def ban(ctx, member: discord.Member = None, *, reason=None):
 @bot.command()
 async def unban(ctx, *, member_id=None):
     """Unbans a member from the server."""
-    # Check if user has moderator role
-    has_role = discord.utils.get(ctx.author.roles, name='Moderator')
+    # Check if user has Organizer role
+    has_role = discord.utils.get(ctx.author.roles, name='Organizer')
     if not has_role:
-        await ctx.send("You don't have permission to use this command. Moderator role required.")
+        await ctx.send("You don't have permission to use this command. Organizer role required.")
         return
 
     # Check if a member ID was specified
@@ -178,10 +178,10 @@ async def unban(ctx, *, member_id=None):
 @bot.command()
 async def kick(ctx, member: discord.Member = None, *, reason=None):
     """Kicks a member from the server."""
-    # Check if user has moderator role
-    has_role = discord.utils.get(ctx.author.roles, name='Moderator')
+    # Check if user has Organizer role
+    has_role = discord.utils.get(ctx.author.roles, name='Organizer')
     if not has_role:
-        await ctx.send("You don't have permission to use this command. Moderator role required.")
+        await ctx.send("You don't have permission to use this command. Organizer role required.")
         return
         
     # Check if a member was specified
@@ -235,7 +235,7 @@ async def htbhelp(ctx):
         "\t`!verify 12345 password` - Verifies your ID and assigns the appropriate role.\n\n"
         "`!htbwhoareyou` - Display a fun message.\n"
         "`!htbhelp` - Display this help message.\n\n"
-        "====== Moderators Only ======\n"
+        "====== Organizers Only ======\n"
         "`!ban @user [reason]` - Ban a user from the server.\n"
         "`!unban <user_id>` - Unban a user from the server.\n"
         "`!kick @user [reason]` - Kick a user from the server.\n\n"
@@ -305,7 +305,7 @@ async def htbpurge(ctx, amount: int = 0):
 @bot.command()
 async def htbwhoareyou(ctx):
     await ctx.send("Hey there! I'm the HackTheBreach Bot. Hope you're having an awesome time at the bootcamp!\n\
-Created by Arka Mondal ([Arix](https://github.com/arixsnow))!")
+Created by Arka Mondal ([Arix](https://github.com/arixsnow)) and Suvan Sarkar ([OrganHarvester](https://github.com/Suvansarkar))!")
 
 # Event listeners for logging
 @bot.event

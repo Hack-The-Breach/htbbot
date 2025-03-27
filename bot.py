@@ -136,6 +136,22 @@ async def ban(ctx, member: discord.Member = None, *, reason=None):
             confirmation += f" for: {reason}"
         await ctx.send(confirmation)
         
+        # Log the ban action
+        log_channel = bot.get_channel(LOG_CHANNEL_ID)
+        if log_channel:
+            embed = discord.Embed(
+                title="Member Banned",
+                description=f"{member.mention} ({member}) has been banned",
+                color=discord.Color.dark_red(),
+                timestamp=datetime.datetime.now()
+            )
+            embed.add_field(name="Banned By", value=f"{ctx.author.mention} ({ctx.author})", inline=False)
+            if reason:
+                embed.add_field(name="Reason", value=reason, inline=False)
+            embed.set_thumbnail(url=member.display_avatar.url)
+            embed.set_footer(text=f"User ID: {member.id}")
+            await log_channel.send(embed=embed)
+        
     except discord.Forbidden:
         await ctx.send("I don't have permission to ban members.")
     except discord.HTTPException as e:
@@ -167,6 +183,19 @@ async def unban(ctx, *, member_id=None):
         # Unban the user
         await ctx.guild.unban(banned_user)
         await ctx.send(f"User with ID {member_id} has been unbanned.")
+        
+        # Log the unban action
+        log_channel = bot.get_channel(LOG_CHANNEL_ID)
+        if log_channel:
+            embed = discord.Embed(
+                title="Member Unbanned",
+                description=f"User with ID {member_id} has been unbanned",
+                color=discord.Color.green(),
+                timestamp=datetime.datetime.now()
+            )
+            embed.add_field(name="Unbanned By", value=f"{ctx.author.mention} ({ctx.author})", inline=False)
+            embed.set_footer(text=f"User ID: {member_id}")
+            await log_channel.send(embed=embed)
         
     except discord.NotFound:
         await ctx.send(f"User with ID {member_id} was not found in the ban list.")
@@ -219,6 +248,22 @@ async def kick(ctx, member: discord.Member = None, *, reason=None):
         if reason:
             confirmation += f" for: {reason}"
         await ctx.send(confirmation)
+        
+        # Log the kick action
+        log_channel = bot.get_channel(LOG_CHANNEL_ID)
+        if log_channel:
+            embed = discord.Embed(
+                title="Member Kicked",
+                description=f"{member.mention} ({member}) has been kicked",
+                color=discord.Color.orange(),
+                timestamp=datetime.datetime.now()
+            )
+            embed.add_field(name="Kicked By", value=f"{ctx.author.mention} ({ctx.author})", inline=False)
+            if reason:
+                embed.add_field(name="Reason", value=reason, inline=False)
+            embed.set_thumbnail(url=member.display_avatar.url)
+            embed.set_footer(text=f"User ID: {member.id}")
+            await log_channel.send(embed=embed)
         
     except discord.Forbidden:
         await ctx.send("I don't have permission to kick members.")

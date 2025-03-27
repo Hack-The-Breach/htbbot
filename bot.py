@@ -383,15 +383,15 @@ async def on_member_join(member):
     # Add server info
     embed.add_field(
         name="Getting Started",
-        value="Please read the server rules and head over to the #verify channel to verify your account.",
+        value="Please read the server rules <#1353659054257602610> and head over to the <#1354154665419477093> channel to verify your account.",
         inline=False
     )
     
     # Add member count
     embed.set_footer(text=f"You are member #{len(member.guild.members)}")
     
-    # Send welcome message
-    await welcome_channel.send(embed=embed)
+    # Send welcome message with a ping to the new member
+    await welcome_channel.send(content=f"Hey {member.mention}, welcome to the server!", embed=embed)
     
     # Also log the join in the log channel
     log_channel = bot.get_channel(LOG_CHANNEL_ID)

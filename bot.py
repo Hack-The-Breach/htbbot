@@ -8,6 +8,7 @@ import os
 import sys
 import datetime
 from discord.ext import commands
+from typing import Optional
 from config import ROLE_ID, TOKEN, LOG_CHANNEL_ID, WELCOME_CHANNEL_ID
 
 intents = discord.Intents.default()
@@ -34,6 +35,44 @@ if os.path.exists('claimed.json') and os.path.getsize('claimed.json') > 0:
 
     for key, value in claimed.items():
         claimed_inv[value] = key
+
+@bot.command()
+async def htbclearverifystat(ctx):
+    has_role = discord.utils.get(ctx.author.roles, name='Organizer')
+    if not has_role:
+        await ctx.send("Bruh! you don't have permission to use this command.")
+        return
+
+    if ctx.channel.name != 'admin-verify-stat-check':
+        await ctx.send("This command can only be used in the #admin-verify-stat-check channel.")
+        return
+
+    role = discord.utils.get(ctx.guild.roles, name="'25 Participant")
+    if not role:
+        await ctx.send("Error: Role '25 Participant not found.")
+        return
+
+    rm_count = 0
+    rm_list = {}
+    for htbid, member_id in claimed.items():
+        member = ctx.guild.get_memeber(int(member_id))
+        if member and role in member.roles:
+            await member.remove_roles(role)
+            rm_count += 1
+            rm_list[htbid] = member_id
+
+    # delete purged member list from verification status
+    for htbid in rm_list.keys():
+        del claimed[htbid]
+
+    for member_id in rm_list.values():
+        del claimed_inv[member_id]
+
+    with open('claimed.json', 'w') as f:
+        json.dump(claimed, f, indent=4)
+
+    await ctx.send(f"Removed \"'25 Participant\" from {rm_count} members.\nMember list: {' '.join(rm_list.values())}")
+
 
 @bot.command()
 async def verify(ctx, id: str = '', passkey: str = ''):
@@ -92,7 +131,7 @@ async def verify(ctx, id: str = '', passkey: str = ''):
         await ctx.send("Error processing verification. Contact Organizers.")
 
 @bot.command()
-async def ban(ctx, member: discord.Member = None, *, reason=None):
+async def ban(ctx, member: Optional[discord.Member] = None, reason: Optional[str] = None):
     """Bans a member from the server."""
     # Check if user has Organizer role
     has_role = discord.utils.get(ctx.author.roles, name='Organizer')
@@ -117,33 +156,32 @@ async def ban(ctx, member: discord.Member = None, *, reason=None):
 
     try:
         # DM the user before banning if possible
-        ban_message = f"You have been banned from {ctx.guild.name}"
+        ban_message = f"You have been banned from {ctx.guild.name}."
         if reason:
-            ban_message += f" for the following reason: {reason}"
-        
+            ban_message += f" Reason: {reason}"
+
         try:
             await member.send(ban_message)
         except discord.HTTPException:
-            # Could not DM the user
-            pass
-            
+            pass  # Ignore if the user has DMs closed
+
         # Ban the member
         await ctx.guild.ban(member, reason=reason, delete_message_days=0)
-        
-        # Confirm the ban
-        confirmation = f"**{member}** has been banned"
+
+        # Confirmation message
+        confirmation = f"{member} has been banned."
         if reason:
-            confirmation += f" for: {reason}"
+            confirmation += f" Reason: {reason}"
         await ctx.send(confirmation)
-        
+
         # Log the ban action
         log_channel = bot.get_channel(LOG_CHANNEL_ID)
-        if log_channel:
+        if isinstance(log_channel, discord.TextChannel):
             embed = discord.Embed(
                 title="Member Banned",
                 description=f"{member.mention} ({member}) has been banned",
                 color=discord.Color.dark_red(),
-                timestamp=datetime.datetime.now()
+                timestamp=discord.utils.utcnow()
             )
             embed.add_field(name="Banned By", value=f"{ctx.author.mention} ({ctx.author})", inline=False)
             if reason:
@@ -151,112 +189,100 @@ async def ban(ctx, member: discord.Member = None, *, reason=None):
             embed.set_thumbnail(url=member.display_avatar.url)
             embed.set_footer(text=f"User ID: {member.id}")
             await log_channel.send(embed=embed)
-        
+
     except discord.Forbidden:
         await ctx.send("I don't have permission to ban members.")
     except discord.HTTPException as e:
         await ctx.send(f"An error occurred while trying to ban the member: {e}")
 
 @bot.command()
-async def unban(ctx, *, member_id=None):
+async def unban(ctx, member_id: Optional[int] = None):
     """Unbans a member from the server."""
-    # Check if user has Organizer role
     has_role = discord.utils.get(ctx.author.roles, name='Organizer')
     if not has_role:
         await ctx.send("You don't have permission to use this command. Organizer role required.")
         return
 
-    # Check if a member ID was specified
     if member_id is None:
         await ctx.send("Usage: `!unban <user_id>`")
         return
-        
+
     try:
-        # Convert string to int if it's a user ID
-        try:
-            user_id = int(member_id)
-            banned_user = discord.Object(id=user_id)
-        except ValueError:
-            await ctx.send("Please provide a valid user ID.")
+        # Fetch the list of banned users
+        banned_users = await ctx.guild.bans()
+        user = next((ban_entry.user for ban_entry in banned_users if ban_entry.user.id == member_id), None)
+
+        if user is None:
+            await ctx.send(f"User with ID {member_id} was not found in the ban list.")
             return
-            
+
         # Unban the user
-        await ctx.guild.unban(banned_user)
-        await ctx.send(f"User with ID {member_id} has been unbanned.")
-        
+        await ctx.guild.unban(user)
+        await ctx.send(f"User {user} ({member_id}) has been unbanned.")
+
         # Log the unban action
         log_channel = bot.get_channel(LOG_CHANNEL_ID)
-        if log_channel:
+        if isinstance(log_channel, discord.TextChannel):  # Ensure it's a text channel
             embed = discord.Embed(
                 title="Member Unbanned",
-                description=f"User with ID {member_id} has been unbanned",
+                description=f"{user.mention} ({user}) has been unbanned",
                 color=discord.Color.green(),
-                timestamp=datetime.datetime.now()
+                timestamp=discord.utils.utcnow()
             )
             embed.add_field(name="Unbanned By", value=f"{ctx.author.mention} ({ctx.author})", inline=False)
-            embed.set_footer(text=f"User ID: {member_id}")
+            embed.set_footer(text=f"User ID: {user.id}")
             await log_channel.send(embed=embed)
-        
-    except discord.NotFound:
-        await ctx.send(f"User with ID {member_id} was not found in the ban list.")
+
     except discord.Forbidden:
         await ctx.send("I don't have permission to unban members.")
     except discord.HTTPException as e:
         await ctx.send(f"An error occurred while trying to unban the member: {e}")
 
 @bot.command()
-async def kick(ctx, member: discord.Member = None, *, reason=None):
+@commands.has_permissions(kick_members=True)
+async def kick(ctx, member: Optional[discord.Member], reason: Optional[str] = None):
     """Kicks a member from the server."""
-    # Check if user has Organizer role
     has_role = discord.utils.get(ctx.author.roles, name='Organizer')
     if not has_role:
         await ctx.send("You don't have permission to use this command. Organizer role required.")
         return
-        
-    # Check if a member was specified
+
     if member is None:
         await ctx.send("Usage: `!kick @user [reason]`")
         return
-        
-    # Cannot kick yourself
+
     if member == ctx.author:
         await ctx.send("You cannot kick yourself.")
         return
-        
-    # Cannot kick users with same or higher role
+
     if ctx.author.top_role <= member.top_role and ctx.author != ctx.guild.owner:
         await ctx.send("You cannot kick a member with the same or higher role than you.")
         return
-        
+
     try:
-        # DM the user before kicking if possible
         kick_message = f"You have been kicked from {ctx.guild.name}"
         if reason:
             kick_message += f" for the following reason: {reason}"
-            
+
         try:
             await member.send(kick_message)
         except discord.HTTPException:
-            # Could not DM the user
-            pass
-            
-        # Kick the member
+            pass  # Could not DM the user
+
         await ctx.guild.kick(member, reason=reason)
-        
-        # Confirm the kick
-        confirmation = f"**{member}** has been kicked"
+
+        confirmation = f"{member} has been kicked"
         if reason:
             confirmation += f" for: {reason}"
         await ctx.send(confirmation)
-        
-        # Log the kick action
+
         log_channel = bot.get_channel(LOG_CHANNEL_ID)
-        if log_channel:
+        if isinstance(log_channel, discord.TextChannel):  # Ensure it's a text channel
             embed = discord.Embed(
                 title="Member Kicked",
                 description=f"{member.mention} ({member}) has been kicked",
                 color=discord.Color.orange(),
-                timestamp=datetime.datetime.now()
+                timestamp=discord.utils.utcnow()
             )
             embed.add_field(name="Kicked By", value=f"{ctx.author.mention} ({ctx.author})", inline=False)
             if reason:
@@ -264,7 +290,7 @@ async def kick(ctx, member: discord.Member = None, *, reason=None):
             embed.set_thumbnail(url=member.display_avatar.url)
             embed.set_footer(text=f"User ID: {member.id}")
             await log_channel.send(embed=embed)
-        
+
     except discord.Forbidden:
         await ctx.send("I don't have permission to kick members.")
     except discord.HTTPException as e:
@@ -283,17 +309,17 @@ async def htbhelp(ctx):
         "====== Organizers Only ======\n"
         "`!ban @user [reason]` - Ban a user from the server.\n"
         "`!unban <user_id>` - Unban a user from the server.\n"
-        "`!kick @user [reason]` - Kick a user from the server.\n\n"
-        "====== Organizers Only ======\n"
-        "`!verifystatcheck <id>` - Check the verification status of participant\n"
-        "`!htbpurge <amount>` - Delete a specific number of messages from a channel.\n"
+        "`!kick @user [reason]` - Kick a user from the server.\n"
+        "`!htbverifystatcheck <id>|dumpall` - Check the verification status of participant\n"
+        "`!htbpurge <count>` - Purge #count messages\n"
+        "`!htbclearverifystat` - Purge all verification status of all participants\n"
     )
     await ctx.send(help_message)
 
 @bot.command()
-async def verifystatcheck(ctx, id: str = ''):
+async def htbverifystatcheck(ctx, id: str = ''):
     if id == '':
-        await ctx.send("Usage: `!verifystatcheck <id>`")
+        await ctx.send("Usage: `!htbverifystatcheck <id>`")
         return
 
     has_role = discord.utils.get(ctx.author.roles, name='Organizer')
@@ -303,6 +329,10 @@ async def verifystatcheck(ctx, id: str = ''):
 
     if ctx.channel.name != 'admin-verify-stat-check':
         await ctx.send("This command can only be used in the #admin-verify-stat-check channel.")
+        return
+
+    if id == 'dumpall':
+        await ctx.send(f"Vefiication Status: success\n{'\n'.join(f'{key}: {value}' for key, value in claimed.items())}")
         return
 
     if id not in claimed:
@@ -335,8 +365,6 @@ async def htbpurge(ctx, amount: int = 0):
 
         # Bulk delete messages
         deleted = await ctx.channel.purge(limit=amount)
-
-        # Send a confirmation message
         confirmation = await ctx.send(f"Deleted {len(deleted)} messages.")
 
         # Auto-delete the confirmation message after 5 seconds
@@ -355,152 +383,138 @@ Created by Arka Mondal ([Arix](https://github.com/arixsnow)) and Suvan Sarkar ([
 # Event listeners for logging
 @bot.event
 async def on_ready():
-    print(f'{bot.user.name} has connected to Discord!')
+    print(f'{bot.user.name if bot.user else "Unkown"} has connected to Discord!')
     print(f'Bot is in {len(bot.guilds)} guilds')
 
 @bot.event
 async def on_member_join(member):
     """Event handler for when a member joins the server."""
+
     # Get the welcome channel
     welcome_channel = bot.get_channel(WELCOME_CHANNEL_ID)
-    if not welcome_channel:
-        return  # Welcome channel not found
-    
+    if not isinstance(welcome_channel, discord.TextChannel):
+        return
+
     # Create welcome embed
     embed = discord.Embed(
         title=f"Welcome to {member.guild.name}!",
         description=f"Hey {member.mention}, welcome to our server! We're glad to have you here.",
         color=discord.Color.blue(),
-        timestamp=datetime.datetime.now()
+        timestamp=datetime.datetime.utcnow()  # Use UTC for consistency
     )
-    
+
     # Add user avatar if available
-    embed.set_thumbnail(url=member.display_avatar.url)
-    
+    embed.set_thumbnail(url=member.avatar.url if member.avatar else None)
+
     # Add welcome GIF
     embed.set_image(url="https://i.pinimg.com/originals/4e/9e/1f/4e9e1f5a41b738e3066d135da871a46c.gif")
-    
+
     # Add server info
     embed.add_field(
         name="Getting Started",
         value="Please read the server rules <#1353659054257602610> and head over to the <#1354154665419477093> channel to verify your account.",
         inline=False
     )
-    
+
     # Add member count
-    embed.set_footer(text=f"You are member #{len(member.guild.members)}")
-    
+    embed.set_footer(text=f"You are member #{member.guild.member_count}")
+
     # Send welcome message with a ping to the new member
     await welcome_channel.send(content=f"Hey {member.mention}, welcome to the server!", embed=embed)
-    
+
     # Also log the join in the log channel
     log_channel = bot.get_channel(LOG_CHANNEL_ID)
-    if log_channel:
+    if isinstance(log_channel, discord.TextChannel):
         log_embed = discord.Embed(
             title="Member Joined",
             description=f"{member.mention} ({member}) has joined the server",
             color=discord.Color.green(),
-            timestamp=datetime.datetime.now()
+            timestamp=datetime.datetime.utcnow()
         )
-        log_embed.set_thumbnail(url=member.display_avatar.url)
+        log_embed.set_thumbnail(url=member.avatar.url if member.avatar else None)
         log_embed.add_field(name="Account Created", value=member.created_at.strftime("%Y-%m-%d %H:%M:%S UTC"), inline=False)
         log_embed.set_footer(text=f"User ID: {member.id}")
         await log_channel.send(embed=log_embed)
 
 @bot.event
 async def on_message_delete(message):
-    # Ignore messages from bots
     if message.author.bot:
         return
-        
-    # Get the log channel
+
     log_channel = bot.get_channel(LOG_CHANNEL_ID)
-    if not log_channel:
-        return  # Log channel not found
-        
-    # Create an embed for the deleted message
+
+    # Ensure log_channel is a TextChannel before sending messages
+    if not isinstance(log_channel, discord.TextChannel):
+        return
+
     embed = discord.Embed(
         title="Message Deleted",
         description=f"Message by {message.author.mention} deleted in {message.channel.mention}",
         color=discord.Color.red(),
-        timestamp=datetime.datetime.now()
+        timestamp=datetime.datetime.utcnow()
     )
-    
+
     # Add message content if available
     if message.content:
-        # Truncate if too long
-        content = message.content
-        if len(content) > 1024:
-            content = content[:1021] + "..."
+        content = message.content[:1021] + "..." if len(message.content) > 1024 else message.content
         embed.add_field(name="Content", value=content, inline=False)
-    
-    # Add attachments info if any
+
     if message.attachments:
-        attachment_info = "\n".join([f"[{a.filename}]({a.url})" for a in message.attachments])
-        if attachment_info:
-            embed.add_field(name="Attachments", value=attachment_info, inline=False)
-    
-    # Add footer with user info
+        attachment_info = "\n".join(f"[{a.filename}]({a.url})" for a in message.attachments)
+        if len(attachment_info) > 1024:
+            attachment_info = attachment_info[:1021] + "..."
+        embed.add_field(name="Attachments", value=attachment_info, inline=False)
+
     embed.set_footer(text=f"User ID: {message.author.id} | Message ID: {message.id}")
-    
-    # Send the log
+
     await log_channel.send(embed=embed)
 
 @bot.event
 async def on_message_edit(before, after):
-    # Ignore edits by bots or when content hasn't changed
     if before.author.bot or before.content == after.content:
         return
-        
-    # Get the log channel
+
     log_channel = bot.get_channel(LOG_CHANNEL_ID)
-    if not log_channel:
-        return  # Log channel not found
-        
-    # Create an embed for the edited message
+
+    # Ensure log_channel is a TextChannel before sending messages
+    if not isinstance(log_channel, discord.TextChannel):
+        return
+
     embed = discord.Embed(
         title="Message Edited",
         description=f"Message by {before.author.mention} edited in {before.channel.mention}",
         color=discord.Color.gold(),
-        timestamp=datetime.datetime.now()
+        timestamp=datetime.datetime.utcnow()
     )
-    
-    # Add before content
+
+    # Add before content if it exists
     if before.content:
-        # Truncate if too long
-        content = before.content
-        if len(content) > 1024:
-            content = content[:1021] + "..."
+        content = before.content[:1021] + "..." if len(before.content) > 1024 else before.content
         embed.add_field(name="Before", value=content, inline=False)
-    
-    # Add after content
+
+    # Add after content if it exists
     if after.content:
-        # Truncate if too long
-        content = after.content
-        if len(content) > 1024:
-            content = content[:1021] + "..."
+        content = after.content[:1021] + "..." if len(after.content) > 1024 else after.content
         embed.add_field(name="After", value=content, inline=False)
-    
-    # Add link to the message
+
     embed.add_field(
-        name="Jump to Message", 
-        value=f"[Click here]({after.jump_url})", 
+        name="Jump to Message",
+        value=f"[Click here]({after.jump_url})",
         inline=False
     )
-    
-    # Add footer with user info
+
     embed.set_footer(text=f"User ID: {before.author.id} | Message ID: {before.id}")
-    
-    # Send the log
+
     await log_channel.send(embed=embed)
 
 @bot.event
 async def on_guild_channel_create(channel):
-    # Get the log channel
     log_channel = bot.get_channel(LOG_CHANNEL_ID)
-    if not log_channel:
-        return  # Log channel not found
-        
+
+    # Ensure log_channel is a TextChannel before sending messages
+    if not isinstance(log_channel, discord.TextChannel):
+        return
+
     # Get channel type
     if isinstance(channel, discord.TextChannel):
         channel_type = "Text Channel"
@@ -510,35 +524,35 @@ async def on_guild_channel_create(channel):
         channel_type = "Category"
     else:
         channel_type = "Channel"
-    
+
     # Get audit logs to find who created the channel
+    creator = None
     try:
         async for entry in channel.guild.audit_logs(limit=1, action=discord.AuditLogAction.channel_create):
-            creator = entry.user
-            break
-    except:
-        creator = None
-    
-    # Create an embed for the channel creation
+            if entry.target and isinstance(entry.target, discord.abc.GuildChannel):  # Ensure target exists and is a channel
+                if entry.target.id == channel.id:
+                    creator = entry.user
+                    break
+    except discord.Forbidden:
+        print("Bot lacks permission to view audit logs.")
+    except discord.HTTPException as e:
+        print(f"Failed to fetch audit logs: {e}")
+
     embed = discord.Embed(
         title=f"{channel_type} Created",
         description=f"#{channel.name} was created",
         color=discord.Color.green(),
-        timestamp=datetime.datetime.now()
+        timestamp=datetime.datetime.utcnow()
     )
-    
-    # Add creator info if available
+
     if creator:
         embed.add_field(name="Created By", value=f"{creator.mention} ({creator.name}#{creator.discriminator})", inline=False)
-    
-    # Add category if applicable
-    if hasattr(channel, 'category') and channel.category:
+
+    if isinstance(channel, (discord.TextChannel, discord.VoiceChannel)) and channel.category:
         embed.add_field(name="Category", value=channel.category.name, inline=False)
-    
-    # Add channel ID
+
     embed.set_footer(text=f"Channel ID: {channel.id}")
-    
-    # Send the log
+
     await log_channel.send(embed=embed)
 
 if __name__ == '__main__':

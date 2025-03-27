@@ -8,7 +8,7 @@ import os
 import sys
 import datetime
 from discord.ext import commands
-from config import ROLE_ID, TOKEN, LOG_CHANNEL_ID
+from config import ROLE_ID, TOKEN, LOG_CHANNEL_ID, WELCOME_CHANNEL_ID
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -357,6 +357,55 @@ Created by Arka Mondal ([Arix](https://github.com/arixsnow)) and Suvan Sarkar ([
 async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
     print(f'Bot is in {len(bot.guilds)} guilds')
+
+@bot.event
+async def on_member_join(member):
+    """Event handler for when a member joins the server."""
+    # Get the welcome channel
+    welcome_channel = bot.get_channel(WELCOME_CHANNEL_ID)
+    if not welcome_channel:
+        return  # Welcome channel not found
+    
+    # Create welcome embed
+    embed = discord.Embed(
+        title=f"Welcome to {member.guild.name}!",
+        description=f"Hey {member.mention}, welcome to our server! We're glad to have you here.",
+        color=discord.Color.blue(),
+        timestamp=datetime.datetime.now()
+    )
+    
+    # Add user avatar if available
+    embed.set_thumbnail(url=member.display_avatar.url)
+    
+    # Add welcome GIF
+    embed.set_image(url="https://i.pinimg.com/originals/4e/9e/1f/4e9e1f5a41b738e3066d135da871a46c.gif")
+    
+    # Add server info
+    embed.add_field(
+        name="Getting Started",
+        value="Please read the server rules and head over to the #verify channel to verify your account.",
+        inline=False
+    )
+    
+    # Add member count
+    embed.set_footer(text=f"You are member #{len(member.guild.members)}")
+    
+    # Send welcome message
+    await welcome_channel.send(embed=embed)
+    
+    # Also log the join in the log channel
+    log_channel = bot.get_channel(LOG_CHANNEL_ID)
+    if log_channel:
+        log_embed = discord.Embed(
+            title="Member Joined",
+            description=f"{member.mention} ({member}) has joined the server",
+            color=discord.Color.green(),
+            timestamp=datetime.datetime.now()
+        )
+        log_embed.set_thumbnail(url=member.display_avatar.url)
+        log_embed.add_field(name="Account Created", value=member.created_at.strftime("%Y-%m-%d %H:%M:%S UTC"), inline=False)
+        log_embed.set_footer(text=f"User ID: {member.id}")
+        await log_channel.send(embed=log_embed)
 
 @bot.event
 async def on_message_delete(message):

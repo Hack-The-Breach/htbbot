@@ -91,6 +91,140 @@ async def verify(ctx, id: str = '', passkey: str = ''):
         await ctx.send("Error processing verification. Contact Organizers.")
 
 @bot.command()
+async def ban(ctx, member: discord.Member = None, *, reason=None):
+    """Bans a member from the server."""
+    # Check if user has moderator role
+    has_role = discord.utils.get(ctx.author.roles, name='Moderator')
+    if not has_role:
+        await ctx.send("You don't have permission to use this command. Moderator role required.")
+        return
+
+    # Check if a member was specified
+    if member is None:
+        await ctx.send("Usage: `!ban @user [reason]`")
+        return
+
+    # Cannot ban yourself
+    if member == ctx.author:
+        await ctx.send("You cannot ban yourself.")
+        return
+
+    # Cannot ban users with same or higher role
+    if ctx.author.top_role <= member.top_role and ctx.author != ctx.guild.owner:
+        await ctx.send("You cannot ban a member with the same or higher role than you.")
+        return
+
+    try:
+        # DM the user before banning if possible
+        ban_message = f"You have been banned from {ctx.guild.name}"
+        if reason:
+            ban_message += f" for the following reason: {reason}"
+        
+        try:
+            await member.send(ban_message)
+        except discord.HTTPException:
+            # Could not DM the user
+            pass
+            
+        # Ban the member
+        await ctx.guild.ban(member, reason=reason, delete_message_days=0)
+        
+        # Confirm the ban
+        confirmation = f"**{member}** has been banned"
+        if reason:
+            confirmation += f" for: {reason}"
+        await ctx.send(confirmation)
+        
+    except discord.Forbidden:
+        await ctx.send("I don't have permission to ban members.")
+    except discord.HTTPException as e:
+        await ctx.send(f"An error occurred while trying to ban the member: {e}")
+
+@bot.command()
+async def unban(ctx, *, member_id=None):
+    """Unbans a member from the server."""
+    # Check if user has moderator role
+    has_role = discord.utils.get(ctx.author.roles, name='Moderator')
+    if not has_role:
+        await ctx.send("You don't have permission to use this command. Moderator role required.")
+        return
+
+    # Check if a member ID was specified
+    if member_id is None:
+        await ctx.send("Usage: `!unban <user_id>`")
+        return
+        
+    try:
+        # Convert string to int if it's a user ID
+        try:
+            user_id = int(member_id)
+            banned_user = discord.Object(id=user_id)
+        except ValueError:
+            await ctx.send("Please provide a valid user ID.")
+            return
+            
+        # Unban the user
+        await ctx.guild.unban(banned_user)
+        await ctx.send(f"User with ID {member_id} has been unbanned.")
+        
+    except discord.NotFound:
+        await ctx.send(f"User with ID {member_id} was not found in the ban list.")
+    except discord.Forbidden:
+        await ctx.send("I don't have permission to unban members.")
+    except discord.HTTPException as e:
+        await ctx.send(f"An error occurred while trying to unban the member: {e}")
+
+@bot.command()
+async def kick(ctx, member: discord.Member = None, *, reason=None):
+    """Kicks a member from the server."""
+    # Check if user has moderator role
+    has_role = discord.utils.get(ctx.author.roles, name='Moderator')
+    if not has_role:
+        await ctx.send("You don't have permission to use this command. Moderator role required.")
+        return
+        
+    # Check if a member was specified
+    if member is None:
+        await ctx.send("Usage: `!kick @user [reason]`")
+        return
+        
+    # Cannot kick yourself
+    if member == ctx.author:
+        await ctx.send("You cannot kick yourself.")
+        return
+        
+    # Cannot kick users with same or higher role
+    if ctx.author.top_role <= member.top_role and ctx.author != ctx.guild.owner:
+        await ctx.send("You cannot kick a member with the same or higher role than you.")
+        return
+        
+    try:
+        # DM the user before kicking if possible
+        kick_message = f"You have been kicked from {ctx.guild.name}"
+        if reason:
+            kick_message += f" for the following reason: {reason}"
+            
+        try:
+            await member.send(kick_message)
+        except discord.HTTPException:
+            # Could not DM the user
+            pass
+            
+        # Kick the member
+        await ctx.guild.kick(member, reason=reason)
+        
+        # Confirm the kick
+        confirmation = f"**{member}** has been kicked"
+        if reason:
+            confirmation += f" for: {reason}"
+        await ctx.send(confirmation)
+        
+    except discord.Forbidden:
+        await ctx.send("I don't have permission to kick members.")
+    except discord.HTTPException as e:
+        await ctx.send(f"An error occurred while trying to kick the member: {e}")
+
+@bot.command()
 async def htbhelp(ctx):
     """Displays help information for bot commands."""
     help_message = (
@@ -100,8 +234,13 @@ async def htbhelp(ctx):
         "\t`!verify 12345 password` - Verifies your ID and assigns the appropriate role.\n\n"
         "`!htbwhoareyou` - Display a fun message.\n"
         "`!htbhelp` - Display this help message.\n\n"
+        "====== Moderators Only ======\n"
+        "`!ban @user [reason]` - Ban a user from the server.\n"
+        "`!unban <user_id>` - Unban a user from the server.\n"
+        "`!kick @user [reason]` - Kick a user from the server.\n\n"
         "====== Organizers Only ======\n"
         "`!verifystatcheck <id>` - Check the verification status of participant\n"
+        "`!htbpurge <amount>` - Delete a specific number of messages from a channel.\n"
     )
     await ctx.send(help_message)
 

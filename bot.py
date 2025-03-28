@@ -157,12 +157,18 @@ async def htbcrtstatbackup(ctx):
         return
 
     # create a folder if it doesn't exist
-    os.makedirs("backup", exist_ok=True)
+    try:
+        os.makedirs("backup", exist_ok=True)
 
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    filename = os.path.join("backup", f"claimed_{timestamp}.txt")
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        filename = os.path.join("backup", f"claimed_backup_{timestamp}.txt")
 
-    shutil.copyfile("claimed.json", filename)
+        shutil.copyfile("claimed.json", filename)
+
+        await ctx.send(f"File ({filename}) successfully backed up.")
+
+    except Exception as e:
+         await ctx.send(f"Backup failed: {str(e)}")
 
 
 @bot.command()

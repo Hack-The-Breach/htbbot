@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import datetime
+import shutil
 from discord.ext import commands
 from typing import Optional
 from config import ROLE_ID, TOKEN, LOG_CHANNEL_ID, WELCOME_CHANNEL_ID
@@ -38,44 +39,6 @@ if os.path.exists('claimed.json') and os.path.getsize('claimed.json') > 0:
 
     for key, value in claimed.items():
         claimed_inv[value] = key
-
-@bot.command()
-async def htbclearverifystat(ctx):
-    has_role = discord.utils.get(ctx.author.roles, name='Organizer')
-    if not has_role:
-        await ctx.send("Bruh! you don't have permission to use this command.")
-        return
-
-    if ctx.channel.name != 'admin-verify-stat-check':
-        await ctx.send("This command can only be used in the #admin-verify-stat-check channel.")
-        return
-
-    role = discord.utils.get(ctx.guild.roles, name="'25 Participant")
-    if not role:
-        await ctx.send("Error: Role '25 Participant not found.")
-        return
-
-    rm_count = 0
-    rm_list = {}
-    for htbid, member_id in claimed.items():
-        member = ctx.guild.get_member(int(member_id))
-        if member and role in member.roles:
-            await member.remove_roles(role)
-            rm_count += 1
-            rm_list[htbid] = member_id
-
-    # delete purged member list from verification status
-    for htbid in rm_list.keys():
-        del claimed[htbid]
-
-    for member_id in rm_list.values():
-        del claimed_inv[member_id]
-
-    with open('claimed.json', 'w') as f:
-        json.dump(claimed, f, indent=4)
-
-    await ctx.send(f"Removed \"'25 Participant\" from {rm_count} members.\nMember list: {' '.join(rm_list.values())}")
-
 
 @bot.command()
 async def htbverify(ctx, id: str = '', passkey: str = ''):
@@ -132,6 +95,75 @@ async def htbverify(ctx, id: str = '', passkey: str = ''):
     except Exception as e:
         print(f'Error: {e}')
         await ctx.send("Error processing verification. Contact Organizers.")
+
+@bot.command()
+async def htbclearverifystatus(ctx, *ids):
+    has_role = discord.utils.get(ctx.author.roles, name='Organizer')
+    if not has_role:
+        await ctx.send("Bruh! you don't have permission to use this command.")
+        return
+
+    if ctx.channel.name != 'admin-bot-cmd-run':
+        await ctx.send("This command can only be used in the #admin-bot-cmd-run channel.")
+        return
+
+    role = discord.utils.get(ctx.guild.roles, name="'25 Participant")
+    if not role:
+        await ctx.send("Error: Role '25 Participant not found.")
+        return
+
+    rm_count = 0
+    rm_list = {}
+
+    # delete purged member list from verification status
+    if len(ids) == 1 and ids == 'allandiamsure':
+        for htbid, member_id in claimed.items():
+            member = ctx.guild.get_member(int(member_id))
+            if member and role in member.roles:
+                await member.remove_roles(role)
+                rm_count += 1
+            rm_list[htbid] = member_id
+    else:
+        for id in ids:
+            if id not in claimed.keys():
+                continue
+
+            member = ctx.guild.get_member(int(claimed[id]))
+            if member and role in member.roles:
+                await member.remove_roles(role)
+                rm_count += 1
+            rm_list[id] = claimed[id]
+
+    for htbid in rm_list.keys():
+        del claimed[htbid]
+
+    for member_id in rm_list.values():
+        del claimed_inv[member_id]
+
+    with open('claimed.json', 'w') as f:
+        json.dump(claimed, f, indent=4)
+
+    await ctx.send(f"Removed \"'25 Participant\" from {rm_count} members.\nMember list: {' '.join(rm_list.values())}")
+
+@bot.command()
+async def htbcrtstatbackup(ctx):
+    has_role = discord.utils.get(ctx.author.roles, name='Organizer')
+    if not has_role:
+        await ctx.send("Bruh! you don't have permission to use this command.")
+        return
+
+    if ctx.channel.name != 'admin-bot-cmd-run':
+        await ctx.send("This command can only be used in the #admin-bot-cmd-run channel.")
+        return
+
+    # create a folder if it doesn't exist
+    os.makedirs("backup", exist_ok=True)
+
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    filename = os.path.join("backup", f"claimed_{timestamp}.txt")
+
+    shutil.copyfile("claimed.json", filename)
+
 
 @bot.command()
 async def htbban(ctx, member: Optional[discord.Member] = None, reason: Optional[str] = None):
@@ -314,7 +346,7 @@ async def htbhelp(ctx):
         "**Available Commands:**\n\n"
         "`!htbverify <id> <password>` - Verify yourself using your participant ID.\n\n"
         "\t**Example Usage:**\n"
-        "\t`!htbverify 12345 password` - Verifies your ID and assigns the appropriate role.\n\n"
+        "\t`!htbverify HTB202503XXXX PASSKEY` - Verifies your ID and assigns the appropriate role.\n\n"
         "`!htbwhoareyou` - Display a fun message.\n"
         "`!htbhelp` - Display this help message.\n\n"
         "====== Organizers Only ======\n"
@@ -323,7 +355,8 @@ async def htbhelp(ctx):
         "`!htbkick @user [reason]` - Kick a user from the server.\n"
         "`!htbverifystatcheck <id>|dumpall` - Check the verification status of participant\n"
         "`!htbpurge <count>` - Purge #count messages\n"
-        "`!htbclearverifystat` - Purge all verification status of all participants\n"
+        "`!htbclearverifystatus allandiamsure|ids...` - Purge all verification status of all participants\n"
+        "`!htbcrtstatbackup - Backs-up the verification stat copy!`"
     )
     await ctx.send(help_message)
 
@@ -338,8 +371,8 @@ async def htbverifystatcheck(ctx, id: str = ''):
         await ctx.send("Bruh! you don't have permission to use this command.")
         return
 
-    if ctx.channel.name != 'admin-verify-stat-check':
-        await ctx.send("This command can only be used in the #admin-verify-stat-check channel.")
+    if ctx.channel.name != 'admin-bot-cmd-run':
+        await ctx.send("This command can only be used in the #admin-bot-cmd-run channel.")
         return
 
     if id == 'dumpall':
@@ -450,6 +483,39 @@ async def on_member_join(member):
         await log_channel.send(embed=log_embed)
 
 @bot.event
+async def on_message_add(message):
+    if message.author.bot:
+        return
+
+    log_channel = bot.get_channel(LOG_CHANNEL_ID)
+
+    # Ensure log_channel is a TextChannel before sending messages
+    if not isinstance(log_channel, discord.TextChannel):
+        return
+
+    embed = discord.Embed(
+        title="Message Created",
+        description=f"Message by {message.author.mention} created in {message.channel.mention}",
+        color=discord.Color.green(),
+        timestamp=datetime.datetime.utcnow()
+    )
+
+    # Add message content if available
+    if message.content:
+        content = message.content[:1021] + "..." if len(message.content) > 1024 else message.content
+        embed.add_field(name="Content", value=content, inline=False)
+
+    if message.attachments:
+        attachment_info = "\n".join(f"[{a.filename}]({a.url})" for a in message.attachments)
+        if len(attachment_info) > 1024:
+            attachment_info = attachment_info[:1021] + "..."
+        embed.add_field(name="Attachments", value=attachment_info, inline=False)
+
+    embed.set_footer(text=f"User ID: {message.author.id} | Message ID: {message.id}")
+
+    await log_channel.send(embed=embed)
+
+@bot.event
 async def on_message_delete(message):
     if message.author.bot:
         return
@@ -520,6 +586,15 @@ async def on_message_edit(before, after):
 
     await log_channel.send(embed=embed)
 
+def get_channel_type(channel):
+    if isinstance(channel, discord.TextChannel):
+        return "Text Channel"
+    elif isinstance(channel, discord.VoiceChannel):
+        return "Voice Channel"
+    elif isinstance(channel, discord.CategoryChannel):
+        return "Category"
+    return "Channel"
+
 @bot.event
 async def on_guild_channel_create(channel):
     log_channel = bot.get_channel(LOG_CHANNEL_ID)
@@ -529,14 +604,7 @@ async def on_guild_channel_create(channel):
         return
 
     # Get channel type
-    if isinstance(channel, discord.TextChannel):
-        channel_type = "Text Channel"
-    elif isinstance(channel, discord.VoiceChannel):
-        channel_type = "Voice Channel"
-    elif isinstance(channel, discord.CategoryChannel):
-        channel_type = "Category"
-    else:
-        channel_type = "Channel"
+    channel_type = get_channel_type(channel)
 
     # Get audit logs to find who created the channel
     creator = None
@@ -567,6 +635,102 @@ async def on_guild_channel_create(channel):
     embed.set_footer(text=f"Channel ID: {channel.id}")
 
     await log_channel.send(embed=embed)
+
+@bot.event
+async def on_guild_channel_delete(channel):
+    log_channel = bot.get_channel(LOG_CHANNEL_ID)
+
+    # Ensure log_channel is a TextChannel before sending messages
+    if not isinstance(log_channel, discord.TextChannel):
+        return
+
+    # Get channel type
+    channel_type = get_channel_type(channel)
+
+    # Get audit logs to find who deleted the channel
+    deleter = None
+    try:
+        async for entry in channel.guild.audit_logs(limit=1, action=discord.AuditLogAction.channel_delete):
+            if entry.target and isinstance(entry.target, discord.abc.GuildChannel):  # Ensure target exists and is a channel
+                if entry.target.id == channel.id:
+                    deleter = entry.user
+                    break
+    except discord.Forbidden:
+        print("Bot lacks permission to view audit logs.")
+    except discord.HTTPException as e:
+        print(f"Failed to fetch audit logs: {e}")
+
+    embed = discord.Embed(
+        title=f"{channel_type} Deleted",
+        description=f"#{channel.name} was deleted",
+        color=discord.Color.red(),
+        timestamp=datetime.datetime.utcnow()
+    )
+
+    if deleter:
+        embed.add_field(name="Deleted By", value=f"{deleter.mention} ({deleter.name}#{deleter.discriminator})", inline=False)
+
+    if isinstance(channel, (discord.TextChannel, discord.VoiceChannel)) and channel.category:
+        embed.add_field(name="Category", value=channel.category.name, inline=False)
+
+    embed.set_footer(text=f"Channel ID: {channel.id}")
+
+    await log_channel.send(embed=embed)
+
+@bot.event
+async def on_guild_channel_update(before, after):
+    log_channel = bot.get_channel(LOG_CHANNEL_ID)
+    if not isinstance(log_channel, discord.TextChannel):
+        return
+
+    # Determine channel type
+    channel_type = get_channel_type(after)
+
+    embed = discord.Embed(
+        title=f"{channel_type} Updated",
+        description=f"Changes made to #{after.name}",
+        color=discord.Color.orange(),
+        timestamp=datetime.datetime.utcnow()
+    )
+
+    # updater = await get_updater(after)
+    updater = None
+    try:
+        async for entry in after.guild.audit_logs(limit=1, action=discord.AuditLogAction.channel_update):
+            if entry.target and isinstance(entry.target, discord.abc.GuildChannel):
+                if entry.target.id == after.id:
+                    updater = entry.user
+    except (discord.Forbidden, discord.HTTPException):
+        print("Bot lacks permission to view audit logs.")
+
+    if updater:
+        embed.add_field(name="Updated By", value=f"{updater.mention} ({updater.name}#{updater.discriminator})", inline=False)
+
+    # Get changes using a loop (instead of multiple if statements)
+    changes = get_channel_changes(before, after)
+    if changes:
+        embed.add_field(name="Changes", value="\n".join(changes), inline=False)
+    else:
+        embed.add_field(name="Changes", value="No significant changes detected.", inline=False)
+
+    embed.set_footer(text=f"Channel ID: {after.id}")
+    await log_channel.send(embed=embed)
+
+def get_channel_changes(before, after):
+    changes = []
+    attributes = {
+        "Name": ("name",),
+        "Topic": ("topic",) if isinstance(before, discord.TextChannel) else None,
+        "Slowmode": ("slowmode_delay",) if isinstance(before, discord.TextChannel) else None,
+        "Bitrate": ("bitrate",) if isinstance(before, discord.VoiceChannel) else None,
+        "User Limit": ("user_limit",) if isinstance(before, discord.VoiceChannel) else None
+    }
+
+    for label, attr in attributes.items():
+        if attr and getattr(before, attr[0]) != getattr(after, attr[0]):
+            changes.append(f"**{label}:** `{getattr(before, attr[0])}` → `{getattr(after, attr[0])}`")
+
+    return changes
 
 if __name__ == '__main__':
     if TOKEN == "":

@@ -383,7 +383,7 @@ async def htbverifystatcheck(ctx, id: str = ''):
 
     if id == 'dumpall':
         id_string = '\n'.join(f'{key}: {value}' for key, value in claimed.items())
-        await ctx.send(f"**Vefiication Status: success**\n{id_string}")
+        await ctx.send(f"**Verification Status: success**\n{id_string}")
         return
 
     if id not in claimed:
@@ -429,7 +429,7 @@ async def htbpurge(ctx, amount: int = 0):
 @bot.command()
 async def htbwhoareyou(ctx):
     await ctx.send("Hey there! I'm the HackTheBreach Bot. Hope you're having an awesome time at the bootcamp!\n\
-Created by Arka Mondal ([Arix](https://github.com/arixsnow)) and Suvan Sarkar ([OrganHarvester](https://github.com/Suvansarkar))!")
+Created by Arka Mondal ([ArixSnow](https://github.com/arixsnow)) and Suvan Sarkar ([OrganHarvester](https://github.com/Suvansarkar))!")
 
 # Event listeners for logging
 @bot.event

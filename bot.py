@@ -493,41 +493,6 @@ async def on_member_join(member):
         await log_channel.send(embed=log_embed)
 
 @bot.event
-async def on_message(message):
-    if message.author.bot:
-        return
-
-    log_channel = bot.get_channel(LOG_CHANNEL_ID)
-
-    # Ensure log_channel exists and is a TextChannel
-    if not log_channel or not isinstance(log_channel, discord.TextChannel):
-        print("Log channel not found or invalid.")
-        return
-
-    embed = discord.Embed(
-        title="Message Created",
-        description=f"Message by {message.author.mention} in {message.channel.mention}",
-        color=discord.Color.green(),
-        timestamp=datetime.datetime.now(datetime.UTC)
-    )
-
-    # Add message content if available
-    if message.content:
-        content = message.content[:1021] + "..." if len(message.content) > 1024 else message.content
-        embed.add_field(name="Content", value=content, inline=False)
-
-    # Handle message attachments
-    if message.attachments:
-        attachment_info = "\n".join(f"[{a.filename}]({a.url})" for a in message.attachments)
-        if len(attachment_info) > 1024:
-            attachment_info = attachment_info[:1021] + "..."
-        embed.add_field(name="Attachments", value=attachment_info, inline=False)
-
-    embed.set_footer(text=f"User ID: {message.author.id} | Message ID: {message.id}")
-
-    await bot.process_commands(message)
-
-@bot.event
 async def on_message_delete(message):
     if message.author.bot:
         return

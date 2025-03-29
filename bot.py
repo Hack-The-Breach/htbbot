@@ -456,7 +456,7 @@ async def on_member_join(member):
         title=f"Welcome to {member.guild.name}!",
         description=f"Hey {member.mention}, welcome to our server! We're glad to have you here.",
         color=discord.Color.blue(),
-        timestamp=datetime.datetime.utcnow()  # Use UTC for consistency
+        timestamp=datetime.datetime.now(datetime.UTC)  # Use UTC for consistency
     )
 
     # Add user avatar if available
@@ -485,7 +485,7 @@ async def on_member_join(member):
             title="Member Joined",
             description=f"{member.mention} ({member}) has joined the server",
             color=discord.Color.green(),
-            timestamp=datetime.datetime.utcnow()
+            timestamp=datetime.datetime.now(datetime.UTC)
         )
         log_embed.set_thumbnail(url=member.avatar.url if member.avatar else None)
         log_embed.add_field(name="Account Created", value=member.created_at.strftime("%Y-%m-%d %H:%M:%S UTC"), inline=False)
@@ -508,7 +508,7 @@ async def on_message(message):
         title="Message Created",
         description=f"Message by {message.author.mention} in {message.channel.mention}",
         color=discord.Color.green(),
-        timestamp=datetime.datetime.utcnow()
+        timestamp=datetime.datetime.now(datetime.UTC)
     )
 
     # Add message content if available
@@ -540,7 +540,7 @@ async def on_message_delete(message):
         title="Message Deleted",
         description=f"Message by {message.author.mention} deleted in {message.channel.mention}",
         color=discord.Color.red(),
-        timestamp=datetime.datetime.utcnow()
+        timestamp=datetime.datetime.now(datetime.UTC)
     )
 
     # Add message content if available
@@ -573,7 +573,7 @@ async def on_message_edit(before, after):
         title="Message Edited",
         description=f"Message by {before.author.mention} edited in {before.channel.mention}",
         color=discord.Color.gold(),
-        timestamp=datetime.datetime.utcnow()
+        timestamp=datetime.datetime.now(datetime.UTC)
     )
 
     # Add before content if it exists
@@ -633,7 +633,7 @@ async def on_guild_channel_create(channel):
         title=f"{channel_type} Created",
         description=f"#{channel.name} was created",
         color=discord.Color.green(),
-        timestamp=datetime.datetime.utcnow()
+        timestamp=datetime.datetime.now(datetime.UTC)
     )
 
     if creator:
@@ -674,7 +674,7 @@ async def on_guild_channel_delete(channel):
         title=f"{channel_type} Deleted",
         description=f"#{channel.name} was deleted",
         color=discord.Color.red(),
-        timestamp=datetime.datetime.utcnow()
+        timestamp=datetime.datetime.now(datetime.UTC)
     )
 
     if deleter:
@@ -700,7 +700,7 @@ async def on_guild_channel_update(before, after):
         title=f"{channel_type} Updated",
         description=f"Changes made to #{after.name}",
         color=discord.Color.orange(),
-        timestamp=datetime.datetime.utcnow()
+        timestamp=datetime.datetime.now(datetime.UTC)
     )
 
     # updater = await get_updater(after)

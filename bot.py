@@ -398,6 +398,56 @@ async def htbverifystatcheck(ctx, id: str = ''):
 email: {id_map[id]['email']}")
 
 @bot.command()
+async def htbcheckconsistency(ctx, arg=''):
+    has_role = discord.utils.get(ctx.author.roles, name='Organizer')
+    if not has_role:
+        await ctx.send("Bruh! you don't have permission to use this command.")
+        return
+
+    if ctx.channel.name != 'admin-bot-cmd-run':
+        await ctx.send("This command can only be used in the #admin-bot-cmd-run channel.")
+        return
+
+    role = discord.utils.get(ctx.guild.roles, name="'25 Participant")
+    if not role:
+        await ctx.send("Unexpected Error: Role not found.")
+        return
+
+    has_claimed_set = set(claimed.values())
+    members_with_role = set([str(member.id )for member in ctx.guild.members if role in member.roles])
+
+    claimed_but_not_recv = has_claimed_set - members_with_role
+    has_role_but_not_claimed = members_with_role - has_claimed_set
+
+    if len(claimed_but_not_recv) == 0 and len(has_role_but_not_claimed) == 0:
+        await ctx.send("All records consistent")
+        return
+
+    if len(claimed_but_not_recv) != 0:
+        await ctx.send(f"Inconsistent: [claimed_but_not_recv]: {'\n'.join(claimed_but_not_recv)}\n")
+        if arg == 'fixall' or arg == 'fixhasclaimed':
+            for id in claimed_but_not_recv:
+                try:
+                    await ctx.author.add_roles(role)
+
+                    await ctx.send(f'"{role.name}" role given to `{id}`')
+                except discord.Forbidden:
+                    await ctx.send("I don't have permission to assign roles. Contact Organizers.")
+                except Exception as e:
+                    print(f'Error: {e}')
+
+    if len(has_role_but_not_claimed) != 0:
+        await ctx.send(f"Inconsistent: [has_role_but_not_claimed]:\n{'\n'.join(has_role_but_not_claimed)}\n")
+        if arg == 'fixall' or arg == 'fixhasrole':
+            for id in has_role_but_not_claimed:
+                member = ctx.guild.get_member(int(id))
+                if member and role in member.roles:
+                    await member.remove_roles(role)
+                    await ctx.send(f'"{role.name}" role removed from `{id}`')
+
+    return
+
+@bot.command()
 async def htbpurge(ctx, amount: int = 0):
     has_role = discord.utils.get(ctx.author.roles, name='Organizer')
     if not has_role:

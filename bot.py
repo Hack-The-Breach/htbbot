@@ -423,27 +423,33 @@ async def htbcheckconsistency(ctx, arg=''):
         await ctx.send("All records consistent")
         return
 
-    if len(claimed_but_not_recv) != 0:
-        await ctx.send(f"Inconsistent: [claimed_but_not_recv]: {'\n'.join(claimed_but_not_recv)}\n")
-        if arg == 'fixall' or arg == 'fixhasclaimed':
-            for id in claimed_but_not_recv:
-                try:
-                    await ctx.author.add_roles(role)
+    str_claimed_but_not_recv = '\n' + '\n'.join(claimed_but_not_recv) + '\n'
+    str_has_role_but_not_claimed = '\n' + '\n'.join(has_role_but_not_claimed) + '\n'
 
-                    await ctx.send(f'"{role.name}" role given to `{id}`')
-                except discord.Forbidden:
-                    await ctx.send("I don't have permission to assign roles. Contact Organizers.")
-                except Exception as e:
-                    print(f'Error: {e}')
+    if len(claimed_but_not_recv) != 0:
+        await ctx.send(f"Inconsistent: [claimed_but_not_recv]: {str_claimed_but_not_recv}")
+        if not (arg == 'fixall' or arg == 'fixhasclaimed'):
+            return
+
+        for id in claimed_but_not_recv:
+            try:
+                await ctx.author.add_roles(role)
+                await ctx.send(f'"{role.name}" role given to `{id}`')
+            except discord.Forbidden:
+                await ctx.send("I don't have permission to assign roles. Contact Organizers.")
+            except Exception as e:
+                print(f'Error: {e}')
 
     if len(has_role_but_not_claimed) != 0:
-        await ctx.send(f"Inconsistent: [has_role_but_not_claimed]:\n{'\n'.join(has_role_but_not_claimed)}\n")
-        if arg == 'fixall' or arg == 'fixhasrole':
-            for id in has_role_but_not_claimed:
-                member = ctx.guild.get_member(int(id))
-                if member and role in member.roles:
-                    await member.remove_roles(role)
-                    await ctx.send(f'"{role.name}" role removed from `{id}`')
+        await ctx.send(f"Inconsistent: [has_role_but_not_claimed]: {str_has_role_but_not_claimed}")
+        if not (arg == 'fixall' or arg == 'fixhasrole'):
+            return
+
+        for id in has_role_but_not_claimed:
+            member = ctx.guild.get_member(int(id))
+            if member and role in member.roles:
+                await member.remove_roles(role)
+                await ctx.send(f'"{role.name}" role removed from `{id}`')
 
     return
 

@@ -25,6 +25,10 @@ participants_data = 'participants.json'
 if len(sys.argv) > 1:
     participants_data = sys.argv[1]
 
+claimed_data = 'claimed.json'
+if len(sys.argv) > 2:
+    claimed_data = sys.argv[2]
+
 # Load data
 with open(participants_data, 'r') as f:
     participants = json.load(f)
@@ -33,8 +37,8 @@ id_map = {value['id']: {'email': key, 'name': value['name'], 'password': value['
 
 claimed = {}
 claimed_inv = {}
-if os.path.exists('claimed.json') and os.path.getsize('claimed.json') > 0:
-    with open('claimed.json') as f:
+if os.path.exists(claimed_data) and os.path.getsize(claimed_data) > 0:
+    with open(claimed_data) as f:
         claimed = json.load(f)
 
     for key, value in claimed.items():
@@ -86,7 +90,7 @@ async def htbverify(ctx, id: str = '', passkey: str = ''):
         claimed_inv[str(ctx.author.id)] = id
 
         # Save claimed IDs
-        with open('claimed.json', 'w') as f:
+        with open(claimed_data, 'w') as f:
             json.dump(claimed, f, indent=4)
 
         await ctx.send(f'Verified as **{participant["name"]}**! You\'ve received the "{role.name}" role.')
@@ -140,7 +144,7 @@ async def htbclearverifystatus(ctx, *ids):
     for member_id in rm_list.values():
         del claimed_inv[member_id]
 
-    with open('claimed.json', 'w') as f:
+    with open(claimed_data, 'w') as f:
         json.dump(claimed, f, indent=4)
 
     await ctx.send(f"Removed \"'25 Participant\" from {rm_count} members.\nMember list: {' '.join(rm_list.values())}")
@@ -483,19 +487,20 @@ async def on_member_join(member):
         await log_channel.send(embed=log_embed)
 
 @bot.event
-async def on_message_add(message):
+async def on_message(message):
     if message.author.bot:
         return
 
     log_channel = bot.get_channel(LOG_CHANNEL_ID)
 
-    # Ensure log_channel is a TextChannel before sending messages
-    if not isinstance(log_channel, discord.TextChannel):
+    # Ensure log_channel exists and is a TextChannel
+    if not log_channel or not isinstance(log_channel, discord.TextChannel):
+        print("Log channel not found or invalid.")
         return
 
     embed = discord.Embed(
         title="Message Created",
-        description=f"Message by {message.author.mention} created in {message.channel.mention}",
+        description=f"Message by {message.author.mention} in {message.channel.mention}",
         color=discord.Color.green(),
         timestamp=datetime.datetime.utcnow()
     )
@@ -505,6 +510,7 @@ async def on_message_add(message):
         content = message.content[:1021] + "..." if len(message.content) > 1024 else message.content
         embed.add_field(name="Content", value=content, inline=False)
 
+    # Handle message attachments
     if message.attachments:
         attachment_info = "\n".join(f"[{a.filename}]({a.url})" for a in message.attachments)
         if len(attachment_info) > 1024:
@@ -512,8 +518,6 @@ async def on_message_add(message):
         embed.add_field(name="Attachments", value=attachment_info, inline=False)
 
     embed.set_footer(text=f"User ID: {message.author.id} | Message ID: {message.id}")
-
-    await log_channel.send(embed=embed)
 
 @bot.event
 async def on_message_delete(message):

@@ -525,6 +525,8 @@ async def on_message(message):
 
     embed.set_footer(text=f"User ID: {message.author.id} | Message ID: {message.id}")
 
+    await bot.process_commands(message)
+
 @bot.event
 async def on_message_delete(message):
     if message.author.bot:
@@ -608,8 +610,6 @@ def get_channel_type(channel):
 @bot.event
 async def on_guild_channel_create(channel):
     log_channel = bot.get_channel(LOG_CHANNEL_ID)
-
-    # Ensure log_channel is a TextChannel before sending messages
     if not isinstance(log_channel, discord.TextChannel):
         return
 
@@ -649,8 +649,6 @@ async def on_guild_channel_create(channel):
 @bot.event
 async def on_guild_channel_delete(channel):
     log_channel = bot.get_channel(LOG_CHANNEL_ID)
-
-    # Ensure log_channel is a TextChannel before sending messages
     if not isinstance(log_channel, discord.TextChannel):
         return
 
